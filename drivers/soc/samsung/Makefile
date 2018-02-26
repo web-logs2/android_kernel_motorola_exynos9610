@@ -83,3 +83,9 @@ obj-$(CONFIG_MMI_UNIT_INFO) += mmi-unit-info.o
 
 # SLEEP GPIO
 obj-$(CONFIG_EXYNOS_SLEEP_GPIO)    += exynos-sleepgpio.o
+
+# secmem
+obj-$(CONFIG_ARCH_EXYNOS)       += secmem.o
+
+# state notifier
+obj-$(CONFIG_STATE_NOTIFIER)	+= state_notifier.o
