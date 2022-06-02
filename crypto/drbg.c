@@ -1613,10 +1613,6 @@ static int drbg_uninstantiate(struct drbg_state *drbg)
 		crypto_free_rng(drbg->jent);
 	drbg->jent = NULL;
 
-	if (!IS_ERR_OR_NULL(drbg->jent))
-		crypto_free_rng(drbg->jent);
-	drbg->jent = NULL;
-
 	if (drbg->d_ops)
 		drbg->d_ops->crypto_fini(drbg);
 	drbg_dealloc_state(drbg);
