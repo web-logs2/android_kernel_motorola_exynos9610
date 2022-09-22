@@ -238,6 +238,8 @@ int gpex_gts_init(struct device **dev)
 	gts_info.busy_js = 0;
 	gts_info.idle_js = 0;
 
+	gpex_utils_get_exynos_context()->gts_info = &gts_info;
+
 	return 0;
 }
 

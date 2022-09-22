@@ -21,7 +21,7 @@
 #ifndef _GPEX_CMAR_BOOST_H_
 #define _GPEX_CMAR_BOOST_H_
 
-#include <gpex_common.h>
+struct platform_context;
 
 int gpex_cmar_boost_set_flag(struct platform_context *pctx, int request);
 void gpex_cmar_boost_set_thread_priority(struct platform_context *pctx);

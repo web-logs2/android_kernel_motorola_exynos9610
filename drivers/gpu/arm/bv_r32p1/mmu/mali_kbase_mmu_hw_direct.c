@@ -26,6 +26,8 @@
 #include <tl/mali_kbase_tracepoints.h>
 #include <device/mali_kbase_device.h>
 
+#include <mali_exynos_kbase_entrypoint.h>
+
 /**
  * lock_region() - Generate lockaddr to lock memory region in MMU
  * @pfn:       Starting page frame number of the region to lock
@@ -97,6 +99,7 @@ static int wait_ready(struct kbase_device *kbdev,
 
 	if (max_loops == 0) {
 		dev_err(kbdev->dev, "AS_ACTIVE bit stuck, might be caused by slow/unstable GPU clock or possible faulty FPGA connector\n");
+		mali_exynos_debug_print_info(kbdev);
 		return -1;
 	}
 

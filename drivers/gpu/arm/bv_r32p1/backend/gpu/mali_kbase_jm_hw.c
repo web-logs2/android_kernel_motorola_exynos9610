@@ -38,6 +38,7 @@
 #include <backend/gpu/mali_kbase_irq_internal.h>
 #include <backend/gpu/mali_kbase_jm_internal.h>
 #include <mali_kbase_regs_history_debugfs.h>
+#include <mali_exynos_kbase_entrypoint.h>
 
 static void kbasep_try_reset_gpu_early_locked(struct kbase_device *kbdev);
 static u64 kbasep_apply_limited_core_mask(const struct kbase_device *kbdev,
@@ -276,6 +277,8 @@ void kbase_job_hw_submit(struct kbase_device *kbdev,
 	 */
 	katom->start_timestamp = ktime_get();
 
+	mali_exynos_update_lastjob_time(katom->slot_nr);
+
 	/* GO ! */
 	dev_dbg(kbdev->dev, "JS: Submitting atom %pK from ctx %pK to js[%d] with head=0x%llx",
 				katom, kctx, js, jc_head);
@@ -354,6 +357,8 @@ static void kbasep_job_slot_update_head_start_timestamp(
 			 * too much of an overestimate
 			 */
 			katom->start_timestamp = end_timestamp;
+
+			mali_exynos_update_lastjob_time(katom->slot_nr);
 		}
 	}
 }

@@ -35,6 +35,7 @@ typedef enum {
 	SYSFS_LOCK,
 	PMQOS_LOCK,
 	CLBOOST_LOCK,
+	INTERACTIVE_LOCK,
 	NUMBER_LOCK
 } gpex_clock_lock_type_t;
 
@@ -80,6 +81,7 @@ int gpex_clock_get_max_lock(void);
 int gpex_clock_get_voltage(int clk);
 u64 gpex_clock_get_time(int level);
 u64 gpex_clock_get_time_busy(int level);
+u64 gpex_clock_get_time_in_state_last_update(void);
 int gpex_clock_get_clock(int level);
 int gpex_get_valid_gpu_clock(int clock, bool is_round_up);
 /**************************************

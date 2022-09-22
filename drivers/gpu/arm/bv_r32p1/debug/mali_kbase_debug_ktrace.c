@@ -131,7 +131,11 @@ static void kbasep_ktrace_dump_msg(struct kbase_device *kbdev,
 	lockdep_assert_held(&kbdev->ktrace.lock);
 
 	kbasep_ktrace_format_msg(trace_msg, buffer, sizeof(buffer));
+#ifdef CONFIG_MALI_EXYNOS_DEBUG_FAULT_DUMP
+	dev_warn(kbdev->dev, "%s", buffer);
+#else
 	dev_dbg(kbdev->dev, "%s", buffer);
+#endif
 }
 
 struct kbase_ktrace_msg *kbasep_ktrace_reserve(struct kbase_ktrace *ktrace)
@@ -159,7 +163,11 @@ void kbasep_ktrace_msg_init(struct kbase_ktrace *ktrace,
 	trace_msg->thread_id = task_pid_nr(current);
 	trace_msg->cpu = task_cpu(current);
 
+#ifdef CONFIG_MALI_EXYNOS_DEBUG_FAULT_DUMP
+	ktime_get_ts64(&trace_msg->timestamp);
+#else
 	ktime_get_real_ts64(&trace_msg->timestamp);
+#endif
 
 	/* No need to store a flag about whether there was a kctx, tgid==0 is
 	 * sufficient
@@ -212,6 +220,28 @@ void kbasep_ktrace_clear(struct kbase_device *kbdev)
 	spin_unlock_irqrestore(&kbdev->ktrace.lock, flags);
 }
 
+#ifdef CONFIG_MALI_EXYNOS_DEBUG_FAULT_DUMP
+static void mali_exynos_ktrace_dump(struct kbase_device *kbdev)
+{
+	u32 start;
+	u32 end;
+	u16 count = 0;
+	static const u16 max_count = 32;
+
+	start = kbdev->ktrace.first_out;
+	end = kbdev->ktrace.next_in;
+
+	while (end != start && count < max_count) {
+		struct kbase_ktrace_msg *trace_msg = &kbdev->ktrace.rbuf[end];
+
+		kbasep_ktrace_dump_msg(kbdev, trace_msg);
+
+		end = (end - 1) & KBASE_KTRACE_MASK;
+		count++;
+	}
+}
+#endif
+
 void kbasep_ktrace_dump(struct kbase_device *kbdev)
 {
 	unsigned long flags;
@@ -226,6 +256,9 @@ void kbasep_ktrace_dump(struct kbase_device *kbdev)
 	start = kbdev->ktrace.first_out;
 	end = kbdev->ktrace.next_in;
 
+#ifdef CONFIG_MALI_EXYNOS_DEBUG_FAULT_DUMP
+	mali_exynos_ktrace_dump(kbdev);
+#else
 	while (start != end) {
 		struct kbase_ktrace_msg *trace_msg = &kbdev->ktrace.rbuf[start];
 
@@ -233,6 +266,7 @@ void kbasep_ktrace_dump(struct kbase_device *kbdev)
 
 		start = (start + 1) & KBASE_KTRACE_MASK;
 	}
+#endif
 	dev_dbg(kbdev->dev, "TRACE_END");
 
 	kbasep_ktrace_clear_locked(kbdev);

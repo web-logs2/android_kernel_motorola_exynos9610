@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+// SPDX-License-Identifier: GPL-2.0
 
 /*
  * (C) COPYRIGHT 2021 Samsung Electronics Inc. All rights reserved.
@@ -18,41 +18,17 @@
  * http://www.gnu.org/licenses/gpl-2.0.html.
  */
 
-#include <linux/device.h>
-#include <soc/samsung/bts.h>
+#ifndef _GPEXWA_INTERACTIVE_BOOST_H_
+#define _GPEXWA_INTERACTIVE_BOOST_H_
 
-#include <gpexbe_bts.h>
+#if IS_ENABLED(CONFIG_MALI_EXYNOS_INTERACTIVE_BOOST)
+int gpexwa_interactive_boost_set(int duration);
+int gpexwa_interactive_boost_init(void);
+void gpexwa_interactive_boost_term(void);
+#else
+#define gpexwa_interactive_boost_set(...) 0
+#define gpexwa_interactive_boost_init(...) (void)0
+#define gpexwa_interactive_boost_term(...) (void)0
+#endif
 
-#include <gpex_utils.h>
-
-struct _bts_backend_info {
-	unsigned int bts_scen_idx;
-};
-
-static struct _bts_backend_info bts_info;
-
-int gpexbe_bts_set_bts_mo(int val)
-{
-	int ret = 0;
-
-	if (val > 0)
-		ret = bts_add_scenario(bts_info.bts_scen_idx);
-	else
-		ret = bts_del_scenario(bts_info.bts_scen_idx);
-
-	return ret;
-}
-
-int gpexbe_bts_init()
-{
-	bts_info.bts_scen_idx = bts_get_scenindex("g3d_performance");
-
-	gpex_utils_get_exynos_context()->bts_info = &bts_info;
-
-	return 0;
-}
-
-void gpexbe_bts_term()
-{
-	bts_info.bts_scen_idx = -1;
-}
+#endif /* _GPEXWA_INTERACTIVE_BOOST_H_ */

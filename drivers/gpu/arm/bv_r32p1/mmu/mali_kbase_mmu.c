@@ -713,8 +713,10 @@ page_fault_retry:
 	}
 
 	if (AS_FAULTSTATUS_ACCESS_TYPE_GET(fault_status) ==
-		AS_FAULTSTATUS_ACCESS_TYPE_READ)
+		AS_FAULTSTATUS_ACCESS_TYPE_READ) {
 		dev_warn(kbdev->dev, "Grow on pagefault while reading");
+		mali_exynos_debug_print_info(kbdev);
+	}
 
 	/* find the size we need to grow it by
 	 * we know the result fit in a size_t due to

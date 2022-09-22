@@ -1187,6 +1187,7 @@ static bool jd_submit_atom(struct kbase_context *const kctx,
 		}
 
 		mali_exynos_set_thread_priority(kctx);
+		mali_exynos_set_thread_affinity();
 	} else {
 		/* Soft-job */
 		if (kbase_prepare_soft_job(katom) != 0) {

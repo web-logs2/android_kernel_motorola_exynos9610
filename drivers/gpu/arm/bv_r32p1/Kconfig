@@ -87,7 +87,7 @@ config MALI_MIDGARD_DVFS
 config MALI_GATOR_SUPPORT
 	bool "Enable Streamline tracing support"
 	depends on MALI_MIDGARD
-	default n
+	default y
 	help
 	  Enables kbase tracing used by the Arm Streamline Performance Analyzer.
 	  The tracepoints are used to derive GPU activity charts in Streamline.
@@ -96,7 +96,7 @@ config MALI_MIDGARD_ENABLE_TRACE
 	bool "Enable kbase tracing"
 	depends on MALI_MIDGARD
 	default y if MALI_DEBUG
-	default n
+	default y
 	help
 	  Enables tracing in kbase. Trace log available through
 	  the "mali_trace" debugfs file, when the CONFIG_DEBUG_FS is enabled
@@ -136,7 +136,7 @@ config MALI_DMA_BUF_MAP_ON_DEMAND
 config MALI_DMA_BUF_LEGACY_COMPAT
 	bool "Enable legacy compatibility cache flush on dma-buf map"
 	depends on MALI_MIDGARD && !MALI_DMA_BUF_MAP_ON_DEMAND
-	default y
+	default n
 	help
 	  This option enables compatibility with legacy dma-buf mapping
 	  behavior, then the dma-buf is mapped on import, by adding cache

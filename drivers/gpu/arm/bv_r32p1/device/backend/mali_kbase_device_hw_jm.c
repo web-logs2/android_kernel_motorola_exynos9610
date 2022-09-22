@@ -27,6 +27,8 @@
 #include <mali_kbase_reset_gpu.h>
 #include <mmu/mali_kbase_mmu.h>
 
+#include <mali_exynos_kbase_entrypoint.h>
+
 /**
  * kbase_report_gpu_fault - Report a GPU fault.
  * @kbdev:    Kbase device pointer
@@ -51,6 +53,8 @@ static void kbase_report_gpu_fault(struct kbase_device *kbdev, int multiple)
 		address);
 	if (multiple)
 		dev_warn(kbdev->dev, "There were multiple GPU faults - some have not been reported\n");
+
+	mali_exynos_debug_print_info(kbdev);
 }
 
 void kbase_gpu_interrupt(struct kbase_device *kbdev, u32 val)

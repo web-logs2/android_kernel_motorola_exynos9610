@@ -27,6 +27,62 @@
 
 struct kbase_device;
 
+/* per process context (pointed by kctx) */
+struct platform_context {
+	int cmar_boost;
+	pid_t pid;
+};
+
+typedef struct ifpo_info *ifpo_info_ptr;
+typedef struct _clboost_info *clboost_info_ptr;
+typedef struct _utils_info *utils_info_ptr;
+typedef struct _clock_info *clock_info_ptr;
+typedef struct dvfs_info *dvfs_info_ptr;
+typedef struct _gts_info *gts_info_ptr;
+typedef struct pm_info *pm_info_ptr;
+typedef struct _qos_info *qos_info_ptr;
+typedef struct _qos_table *qos_table_ptr;
+typedef struct _clqos_table *clqos_table_ptr;
+typedef struct _thermal_info *thermal_info_ptr;
+typedef struct _tsg_info *tsg_info_ptr;
+typedef struct _debug_info *debug_info_ptr;
+
+typedef struct _bts_backend_info *bts_backend_info_ptr;
+typedef struct _clock_backend_info *clock_backend_info_ptr;
+typedef struct _debug_backend_info *debug_backend_info_ptr;
+typedef struct _llc_coh_info *llc_coh_info_ptr;
+typedef struct _smc_info *smc_info_ptr;
+
+/**
+ * struct exynos_context - contains pointers to each module's private structure. Per device.
+ */
+struct exynos_context {
+	/* frontends */
+	ifpo_info_ptr ifpo;
+	clboost_info_ptr clboost_info;
+	clock_info_ptr clk_info;
+	dvfs_info_ptr dvfs;
+	gts_info_ptr gts_info;
+	pm_info_ptr pm;
+	qos_info_ptr qos_info;
+	qos_table_ptr qos_table;
+	clqos_table_ptr clqos_table;
+	thermal_info_ptr thermal;
+	tsg_info_ptr tsg;
+
+	/* common */
+	utils_info_ptr utils_info;
+	debug_info_ptr debug_info;
+
+	/* backends */
+	bts_backend_info_ptr bts_info;
+	clock_backend_info_ptr pm_info;
+	debug_backend_info_ptr dbg_info;
+	llc_coh_info_ptr llc_coh_info;
+	smc_info_ptr smc_info;
+};
+
+
 #ifndef GPEX_STATIC
 #if IS_ENABLED(CONFIG_MALI_EXYNOS_UNIT_TESTS)
 #define GPEX_STATIC
@@ -135,6 +191,7 @@ typedef ssize_t (*sysfs_device_write_func)(struct device *, struct device_attrib
 int gpex_utils_get_debug_level(void);
 struct device *gpex_utils_get_device(void);
 struct kbase_device *gpex_utils_get_kbase_device(void);
+struct exynos_context *gpex_utils_get_exynos_context(void);
 
 int gpex_utils_init(struct device **dev);
 void gpex_utils_term(void);
