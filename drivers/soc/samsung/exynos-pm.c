@@ -12,6 +12,8 @@
 #include <linux/notifier.h>
 #include <linux/spinlock.h>
 #include <linux/suspend.h>
+#include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/wakeup_reason.h>
 #include <linux/gpio.h>
 #include <linux/syscore_ops.h>
@@ -40,9 +42,11 @@ extern u32 exynos_eint_to_pin_num(int eint);
 
 #define WAKEUP_STAT_SYSINT_MASK		~((1 << 31) | (1 << 0))
 
+#if IS_ENABLED(CONFIG_SEC_PM_DEBUG)
 struct wakeup_stat_name {
 	const char *name[32];
 };
+#endif /* CONFIG_SEC_PM_DEBUG */
 
 struct exynos_pm_info {
 	void __iomem *eint_base;		/* GPIO_ALIVE base to check wkup reason */
@@ -68,7 +72,11 @@ struct exynos_pm_info {
 	unsigned int stat_access_mif_offset;
 	unsigned int *wakeup_stat;
 	u8 num_wakeup_stat;
+	unsigned int	wakeup_stat_eint;
+	unsigned int	wakeup_stat_rtc;
+#if IS_ENABLED(CONFIG_SEC_PM_DEBUG)
 	struct wakeup_stat_name *ws_names;	/* Names of each bits of wakeup_stat */
+#endif /* CONFIG_SEC_PM_DEBUG */
 };
 static struct exynos_pm_info *pm_info;
 
@@ -78,6 +86,30 @@ struct exynos_pm_dbg {
 	u32 test_usbl2_suspend;
 };
 static struct exynos_pm_dbg *pm_dbg;
+
+#if IS_ENABLED(CONFIG_SEC_PM_DEBUG)
+static void exynos_print_wakeup_sources(int irq, const char *name)
+{
+	struct irq_desc *desc;
+
+	if (irq < 0) {
+		if (name)
+			pr_info("PM: Resume caused by SYSINT: %s\n", name);
+
+		return;
+	}
+
+	desc = irq_to_desc(irq);
+	if (desc && desc->action && desc->action->name)
+		pr_info("PM: Resume caused by IRQ %d, %s\n", irq,
+				desc->action->name);
+	else
+		pr_info("PM: Resume caused by IRQ %d\n", irq);
+}
+#else
+static inline void exynos_print_wakeup_sources(int irq, const char *name) {}
+#endif /* CONFIG_SEC_PM_DEBUG */
+
 
 static void exynos_show_wakeup_reason_eint(void)
 {
@@ -105,9 +137,7 @@ static void exynos_show_wakeup_reason_eint(void)
 			gpio = exynos_eint_to_pin_num(i + bit);
 			irq = gpio_to_irq(gpio);
 
-#ifdef CONFIG_SUSPEND
-			log_irq_wakeup_reason(irq);
-#endif
+			exynos_print_wakeup_sources(irq, NULL);
 			found = 1;
 		}
 	}
@@ -131,6 +161,7 @@ static void exynos_show_wakeup_registers(unsigned int wakeup_stat)
 		pr_info("0x%02x ", __raw_readl(EXYNOS_EINT_PEND(pm_info->eint_base, i)));
 }
 
+#if IS_ENABLED(CONFIG_SEC_PM_DEBUG)
 static void exynos_show_wakeup_reason_sysint(unsigned int stat,
 					struct wakeup_stat_name *ws_names)
 {
@@ -143,6 +174,8 @@ static void exynos_show_wakeup_reason_sysint(unsigned int stat,
 
 		if (!name)
 			continue;
+
+		exynos_print_wakeup_sources(-1, name);
 	}
 }
 
@@ -169,6 +202,7 @@ static void exynos_show_wakeup_reason_detail(unsigned int wakeup_stat)
 		exynos_show_wakeup_reason_sysint(wss, &pm_info->ws_names[i]);
 	}
 }
+#endif /* CONFIG_SEC_PM_DEBUG */
 
 static void exynos_show_wakeup_reason(bool sleep_abort)
 {
@@ -195,18 +229,22 @@ static void exynos_show_wakeup_reason(bool sleep_abort)
 
 	exynos_pmu_read(pm_info->wakeup_stat[0], &wakeup_stat);
 	exynos_show_wakeup_registers(wakeup_stat);
-
+#if IS_ENABLED(CONFIG_SEC_PM_DEBUG)
 	exynos_show_wakeup_reason_detail(wakeup_stat);
-
+#else
 	if (wakeup_stat & WAKEUP_STAT_RTC_ALARM)
 		pr_info("%s Resume caused by RTC alarm\n", EXYNOS_PM_PREFIX);
+	else if (wakeup_stat & WAKEUP_STAT_EINT)
+		exynos_show_wakeup_reason_eint();
 	else {
 		for (i = 0; i < pm_info->num_wakeup_stat; i++) {
 			exynos_pmu_read(pm_info->wakeup_stat[i], &wakeup_stat);
 			pr_info("%s Resume caused by wakeup%d_stat 0x%08x\n",
 					EXYNOS_PM_PREFIX, i + 1, wakeup_stat);
+
 		}
 	}
+#endif /* !CONFIG_SEC_PM_DEBUG */
 }
 
 #ifdef CONFIG_CPU_IDLE
