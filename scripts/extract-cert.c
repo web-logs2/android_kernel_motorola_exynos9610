@@ -25,6 +25,12 @@
 
 #define PKEY_ID_PKCS7 2
 
+/*
+ * FIXME: OpenSSL 3.0 has deprecated some functions. For now just ignore
+ * the warnings.
+ */
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 static __attribute__((noreturn))
 void format(void)
 {
