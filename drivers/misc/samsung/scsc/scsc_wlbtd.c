@@ -4,12 +4,20 @@
  *
  ****************************************************************************/
 #include <linux/mutex.h>
+#include <linux/version.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+#include <scsc/scsc_wakelock.h>
+#else
 #include <linux/wakelock.h>
+#endif
+#include <linux/string.h>
 
 #include "scsc_wlbtd.h"
 
 #define MAX_TIMEOUT		30000 /* in milisecounds */
 #define WRITE_FILE_TIMEOUT	1000 /* in milisecounds */
+#define MAX_RSP_STRING_SIZE	128
+#define PROP_VALUE_MAX		92
 
 /* completion to indicate when EVENT_* is done */
 static DECLARE_COMPLETION(event_done);
@@ -22,10 +30,11 @@ static DEFINE_MUTEX(build_type_lock);
 static char *build_type;
 static DEFINE_MUTEX(sable_lock);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+static struct scsc_wake_lock wlbtd_wakelock;
+#else
 static struct wake_lock wlbtd_wakelock;
-
-/* module parameter controlling recovery handling */
-extern int disable_recovery_handling;
+#endif
 
 const char *response_code_to_str(enum scsc_wlbtd_response_codes response_code)
 {
@@ -71,39 +80,50 @@ const char *response_code_to_str(enum scsc_wlbtd_response_codes response_code)
  */
 static int msg_from_wlbtd_cb(struct sk_buff *skb, struct genl_info *info)
 {
-	int status = 0;
+	unsigned int status = 0;
+	int ret_code = 0;
 
-	if (info->attrs[1])
-		SCSC_TAG_INFO(WLBTD, "ATTR_STR: %s\n",
-				(char *)nla_data(info->attrs[1]));
+	if (!info || !info->attrs[1] || !info->attrs[2] ||
+			(nla_len(info->attrs[1]) > MAX_RSP_STRING_SIZE) ||
+			(nla_len(info->attrs[2]) < sizeof(status))) {
 
-	if (info->attrs[2]) {
-		status = *((__u32 *)nla_data(info->attrs[2]));
-		if (status)
-			SCSC_TAG_ERR(WLBTD, "ATTR_INT: %u\n", status);
+		SCSC_TAG_ERR(WLBTD, "Error parsing arguments\n");
+		ret_code = -EINVAL;
+		goto error_complete;
 	}
 
-	complete(&event_done);
+	SCSC_TAG_INFO(WLBTD, "ATTR_STR: %s\n", (char *)nla_data(info->attrs[1]));
 
-	return 0;
+	status = nla_get_u32(info->attrs[2]);
+	if (status)
+		SCSC_TAG_INFO(WLBTD, "ATTR_INT: %u\n", status);
+
+error_complete:
+	if (!completion_done(&event_done))
+		complete(&event_done);
+	return ret_code;
 }
 
 static int msg_from_wlbtd_sable_cb(struct sk_buff *skb, struct genl_info *info)
 {
-	u16 status;
+	unsigned short status;
 
-	if (!info->attrs[ATTR_INT])
-		return -EINVAL;
+	if (!info || !info->attrs[1] || !info->attrs[2] ||
+			(nla_len(info->attrs[1]) > MAX_RSP_STRING_SIZE) ||
+			(nla_len(info->attrs[2]) < sizeof(status))) {
 
-	if (nla_len(info->attrs[ATTR_INT]) < sizeof(status))
-		return -EINVAL;
+		SCSC_TAG_ERR(WLBTD, "Error parsing arguments\n");
+		goto error_complete;
+	}
 
-	status = nla_get_u16(info->attrs[ATTR_INT]);
+	SCSC_TAG_INFO(WLBTD, "%s\n", nla_data(info->attrs[1]));
+	status = nla_get_u16(info->attrs[2]);
+
 	if ((enum scsc_wlbtd_response_codes)status < SCSC_WLBTD_LAST_RESPONSE_CODE)
 		SCSC_TAG_ERR(WLBTD, "%s\n", response_code_to_str((enum scsc_wlbtd_response_codes)status));
 	else {
 		SCSC_TAG_INFO(WLBTD, "Received invalid status value");
-		return -EINVAL;
+		goto error_complete;
 	}
 
 	/* completion cases :
@@ -185,49 +205,96 @@ static int msg_from_wlbtd_sable_cb(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	return 0;
+
+error_complete:
+	if (!completion_done(&fw_panic_done)) {
+		SCSC_TAG_INFO(WLBTD, "completing fw_panic_done\n");
+		complete(&fw_panic_done);
+	}
+	if (!completion_done(&event_done)) {
+		SCSC_TAG_INFO(WLBTD, "completing event_done\n");
+		complete(&event_done);
+	}
+
+	return -EINVAL;
 }
 
 static int msg_from_wlbtd_build_type_cb(struct sk_buff *skb, struct genl_info *info)
 {
+	char *build_type_str = NULL;
+
+	mutex_lock(&build_type_lock);
+        if (build_type) {
+		SCSC_TAG_INFO(WLBTD, "ro.build.type = %s\n", build_type);
+                mutex_unlock(&build_type_lock);
+                return 0;
+        }
+
+	if (!info) {
+		SCSC_TAG_ERR(WLBTD, "info is NULL\n");
+		mutex_unlock(&build_type_lock);
+		return -EINVAL;
+	}
+
 	if (!info->attrs[1]) {
-		SCSC_TAG_WARNING(WLBTD, "info->attrs[1] = NULL\n");
-		return -1;
+		SCSC_TAG_ERR(WLBTD, "info->attrs[1] = NULL\n");
+		mutex_unlock(&build_type_lock);
+		return -EINVAL;
 	}
 
 	if (!nla_len(info->attrs[1])) {
-		SCSC_TAG_WARNING(WLBTD, "nla_len = 0\n");
-		return -1;
+		SCSC_TAG_ERR(WLBTD, "nla_len = 0\n");
+		mutex_unlock(&build_type_lock);
+		return -EINVAL;
 	}
 
-	mutex_lock(&build_type_lock);
-	if (build_type) {
-		SCSC_TAG_WARNING(WLBTD, "ro.build.type = %s\n", build_type);
+	if (nla_len(info->attrs[1]) > PROP_VALUE_MAX) {
+		SCSC_TAG_ERR(WLBTD, "Received invalid length of data\n");
 		mutex_unlock(&build_type_lock);
-		return 0;
+		return -EINVAL;
 	}
+
 	/* nla_len includes trailing zero. Tested.*/
-	build_type = kmalloc(info->attrs[1]->nla_len, GFP_KERNEL);
+	build_type = kmalloc(PROP_VALUE_MAX + 1, GFP_KERNEL);
 	if (!build_type) {
-		SCSC_TAG_WARNING(WLBTD, "kmalloc failed: build_type = NULL\n");
+		SCSC_TAG_ERR(WLBTD, "kmalloc failed: build_type = NULL\n");
 		mutex_unlock(&build_type_lock);
-		return -1;
+		return -ENOMEM;
 	}
-	memcpy(build_type, (char *)nla_data(info->attrs[1]), info->attrs[1]->nla_len);
-	SCSC_TAG_WARNING(WLBTD, "ro.build.type = %s\n", build_type);
+
+	build_type_str = nla_data(info->attrs[1]);
+	SCSC_TAG_INFO(WLBTD, "build_type_str = %s\n", build_type_str);
+
+	if (!build_type_str) {
+		SCSC_TAG_ERR(WLBTD, "Failed to retrieve build type attribute\n");
+		mutex_unlock(&build_type_lock);
+		return -EINVAL;
+        }
+
+	strncpy(build_type, (const char *)build_type_str, PROP_VALUE_MAX);
+	SCSC_TAG_INFO(WLBTD, "ro.build.type = %s\n", build_type);
 	mutex_unlock(&build_type_lock);
 	return 0;
-
 }
 
 static int msg_from_wlbtd_write_file_cb(struct sk_buff *skb, struct genl_info *info)
 {
-	if (info->attrs[3])
-		SCSC_TAG_INFO(WLBTD, "%s\n", (char *)nla_data(info->attrs[3]));
+	int ret_code = 0;
 
+	if (!info || !info->attrs[3] ||
+			(nla_len(info->attrs[3]) > MAX_RSP_STRING_SIZE)){
+		ret_code = -EINVAL;
+		goto error_complete;
+	}
+
+	SCSC_TAG_INFO(WLBTD, "%s\n", (char *)nla_data(info->attrs[3]));
+
+error_complete:
 	complete(&write_file_done);
-	return 0;
+	return ret_code;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 /**
  * Here you can define some constraints for the attributes so Linux will
  * validate them for you.
@@ -250,6 +317,7 @@ static struct nla_policy policy_write_file[] = {
 	[ATTR_PATH] = { .type = NLA_STRING, },
 	[ATTR_CONTENT] = { .type = NLA_STRING, },
 };
+#endif
 
 
 /**
@@ -259,28 +327,36 @@ const struct genl_ops scsc_ops[] = {
 	{
 		.cmd = EVENT_SCSC,
 		.flags = 0,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		.policy = policies,
+#endif
 		.doit = msg_from_wlbtd_cb,
 		.dumpit = NULL,
 	},
 	{
 		.cmd = EVENT_SYSTEM_PROPERTY,
 		.flags = 0,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		.policy = policies_build_type,
+#endif
 		.doit = msg_from_wlbtd_build_type_cb,
 		.dumpit = NULL,
 	},
 	{
 		.cmd = EVENT_SABLE,
 		.flags = 0,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		.policy = policy_sable,
+#endif
 		.doit = msg_from_wlbtd_sable_cb,
 		.dumpit = NULL,
 	},
 	{
 		.cmd = EVENT_WRITE_FILE,
 		.flags = 0,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		.policy = policy_write_file,
+#endif
 		.doit = msg_from_wlbtd_write_file_cb,
 		.dumpit = NULL,
 	},
@@ -376,7 +452,6 @@ error:
 
 int wlbtd_write_file(const char *file_path, const char *file_content)
 {
-#ifdef CONFIG_SCSC_WRITE_INFO_FILE_WLBTD
 	struct sk_buff *skb;
 	void *msg;
 	int rc = 0;
@@ -471,9 +546,6 @@ error:
 	wake_unlock(&wlbtd_wakelock);
 	mutex_unlock(&write_file_lock);
 	return -1;
-#else /* CONFIG_SCSC_WRITE_INFO_FILE_WLBTD */
-	return 0; /* stub */
-#endif
 }
 EXPORT_SYMBOL(wlbtd_write_file);
 
@@ -702,7 +774,11 @@ int scsc_wlbtd_init(void)
 {
 	int r = 0;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	wake_lock_init(NULL, &(wlbtd_wakelock.ws), "wlbtd_wl");
+#else
 	wake_lock_init(&wlbtd_wakelock, WAKE_LOCK_SUSPEND, "wlbtd_wl");
+#endif
 	init_completion(&event_done);
 	init_completion(&fw_sable_done);
 	init_completion(&fw_panic_done);
