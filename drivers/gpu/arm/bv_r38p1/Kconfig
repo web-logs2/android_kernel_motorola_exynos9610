@@ -26,6 +26,7 @@ menuconfig MALI_MIDGARD
 	select DEVFREQ_THERMAL
 	select FW_LOADER
 	default m if SOC_EXYNOS2100
+	default y if SOC_EXYNOS9610
 	default y if SOC_EXYNOS9830
 	default y
 	help
@@ -65,6 +66,7 @@ config MALI_DEVFREQ
 	depends on MALI_MIDGARD && PM_DEVFREQ
 	select DEVFREQ_GOV_SIMPLE_ONDEMAND
 	default n if SOC_EXYNOS2100
+	default n if SOC_EXYNOS9610
 	default n if SOC_EXYNOS9830
 	default n
 	help
@@ -133,7 +135,7 @@ config MALI_DMA_BUF_MAP_ON_DEMAND
 config MALI_DMA_BUF_LEGACY_COMPAT
 	bool "Enable legacy compatibility cache flush on dma-buf map"
 	depends on MALI_MIDGARD && !MALI_DMA_BUF_MAP_ON_DEMAND
-	default y
+	default n
 	help
 	  This option enables compatibility with legacy dma-buf mapping
 	  behavior, then the dma-buf is mapped on import, by adding cache
@@ -148,6 +150,7 @@ menuconfig MALI_EXPERT
 	depends on MALI_MIDGARD
 	bool "Enable Expert Settings"
 	default y if SOC_EXYNOS2100
+	default y if SOC_EXYNOS9610
 	default y if SOC_EXYNOS9830
 	default y
 	help
@@ -363,8 +366,9 @@ config MALI_HW_ERRATA_1485982_NOT_AFFECTED
 	bool "Disable workaround for BASE_HW_ISSUE_GPU2017_1336"
 	depends on MALI_MIDGARD && MALI_EXPERT
 	default y if SOC_EXYNOS2100
+	default y if SOC_EXYNOS9610
 	default y if SOC_EXYNOS9830
-	default y
+	default n
 	help
 	  This option disables the default workaround for GPU2017-1336. The
 	  workaround keeps the L2 cache powered up except for powerdown and reset.

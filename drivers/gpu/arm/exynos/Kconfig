@@ -216,15 +216,6 @@ config MALI_SEC_G3D_PEAK_NOTI
     help
       Choose this option to enable SEC_G3D_PEAK_NOTI in the Mali tTRx DDK.
 
-config MALI_EXYNOS_EHMP
-    bool "Enable Mali EHMP support"
-	depends on MALI_EXYNOS_QOS
-    default n if SOC_EXYNOS9610
-    default n if SOC_EXYNOS9810
-    default n
-    help
-      Choose this option to for Mali EHMP support.
-
 config MALI_EXYNOS_INTERACTIVE_BOOST
     bool "Enable GPU Interactive boost"
     default y if SOC_S5E8825
@@ -249,6 +240,6 @@ config MALI_EXYNOS_UNIT_TESTS
 config MALI_EXYNOS_DEBUG_FAULT_DUMP
     bool "dump mali trace data on gpu fault"
     depends on MALI_MIDGARD
-    default n
+    default y
     help
       MALI_MIDGARD_ENABLE_TRACE must be enabled for more detailed logs

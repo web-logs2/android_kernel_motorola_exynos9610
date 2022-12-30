@@ -42,7 +42,6 @@
 #include <gpexbe_secure.h>
 #include <gpexbe_dmabuf.h>
 #include <gpexwa_interactive_boost.h>
-#include <gpexwa_ehmp.h>
 
 #include <mali_exynos_ioctl.h>
 
@@ -76,17 +75,6 @@ static int mali_exynos_ioctl_interactive_boost_fn(struct kbase_context *kctx,
 					  struct mali_exynos_ioctl_interactive_boost *dur)
 {
 	return gpexwa_interactive_boost_set(dur->duration);
-}
-
-static int mali_exynos_ioctl_ehmp_fn(struct kbase_context *kctx,
-					  struct mali_exynos_ioctl_ehmp_flags *state)
-{
-	if (state->flags == EHMP_SET)
-		gpexwa_ehmp_set();
-	else if (state->flags == EHMP_UNSET)
-		gpexwa_ehmp_unset();
-
-	return 0;
 }
 
 static int mali_exynos_ioctl_cmar_boost_fn(struct kbase_context *kctx,
@@ -236,11 +224,6 @@ int mali_exynos_ioctl(struct kbase_context *kctx, unsigned int cmd, unsigned lon
 	case MALI_EXYNOS_IOCTL_INTERACTIVE_BOOST:
 		KBASE_HANDLE_IOCTL_IN(cmd, mali_exynos_ioctl_interactive_boost_fn,
 				      struct mali_exynos_ioctl_interactive_boost, kctx);
-		break;
-
-	case MALI_EXYNOS_IOCTL_EHMP:
-		KBASE_HANDLE_IOCTL_IN(cmd, mali_exynos_ioctl_ehmp_fn,
-				      struct mali_exynos_ioctl_ehmp_flags, kctx);
 		break;
 	}
 
@@ -480,7 +463,6 @@ static int mali_exynos_kbase_context_init(struct kbase_context *kctx)
 
 static void mali_exynos_kbase_context_term(struct kbase_context *kctx)
 {
-	gpexwa_ehmp_unset();
 	kfree(kctx->platform_data);
 }
 

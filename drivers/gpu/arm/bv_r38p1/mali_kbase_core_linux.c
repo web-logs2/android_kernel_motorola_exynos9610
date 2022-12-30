@@ -5372,8 +5372,6 @@ int kbase_sysfs_init(struct kbase_device *kbdev)
 			&kbase_attr_group);
 	}
 
-	mali_exynos_sysfs_set_gpu_model_callback(&gpuinfo_show);
-
 	return err;
 }
 
